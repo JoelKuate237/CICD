@@ -1,0 +1,39 @@
+{
+  "name": "bonus-github-actions",
+  "version": "1.0.0",
+  "description": "Projet bonus - CI/CD avec GitHub Actions",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "jest --verbose --forceExit",
+    "test:coverage": "jest --verbose --coverage --forceExit",
+    "test:ci": "jest --verbose --coverage --forceExit --coverageReporters=text --coverageReporters=lcov",
+    "build": "node scripts/build.js",
+    "lint": "echo 'Linting du code...' && exit 0"
+  },
+  "keywords": [
+    "cicd",
+    "github-actions",
+    "formation",
+    "bonus"
+  ],
+  "author": "Formation CI/CD",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageDirectory": "coverage"
+  }
+}

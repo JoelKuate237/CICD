@@ -1,0 +1,126 @@
+# ============================================================
+# FICHIER : traefik.yml
+# DESCRIPTION : Configuration Docker Compose pour Traefik
+#
+# Traefik est un REVERSE PROXY (proxy inverse).
+# Son role est de recevoir les requetes des utilisateurs
+# et de les rediriger vers le bon conteneur (Blue ou Green).
+#
+# Traefik detecte AUTOMATIQUEMENT les conteneurs Docker
+# grace aux labels definis dans les fichiers docker-compose.
+# C'est ce qu'on appelle la "decouverte de services" (service discovery).
+#
+# Dans notre strategie Blue/Green :
+#   - Traefik ecoute sur le port 80 (HTTP)
+#   - Il redirige les requetes vers Blue OU Green
+#   - La bascule se fait en demarrant/arretant les conteneurs
+#   - Traefik detecte automatiquement les changements
+#
+# Schema :
+#   Navigateur --> :80 --> Traefik --> :3000 --> Blue ou Green
+# ============================================================
+
+# NOTE : la cle "version" est volontairement absente (obsolete en Docker Compose v2)
+
+# --- DEFINITION DES SERVICES ---
+services:
+
+  # Service Traefik (le reverse proxy / routeur)
+  traefik:
+    # --- NOM DU CONTENEUR ---
+    container_name: traefik
+
+    # --- IMAGE DOCKER ---
+    # On utilise l'image officielle de Traefik version 2.10
+    # C'est une version stable et largement utilisee
+    image: traefik:v2.10
+
+    # --- COMMANDE DE DEMARRAGE ---
+    # Les arguments de la ligne de commande configurent Traefik
+    command:
+      # Active le fournisseur Docker
+      # Cela signifie que Traefik va scanner les conteneurs Docker
+      # et lire leurs labels pour configurer le routage
+      - "--providers.docker=true"
+
+      # N'expose PAS les conteneurs par defaut
+      # Seuls les conteneurs avec le label "traefik.enable=true"
+      # seront pris en compte. C'est une securite.
+      - "--providers.docker.exposedbydefault=false"
+
+      # Definit un point d'entree nomme "web" sur le port 80
+      # Un point d'entree = un port sur lequel Traefik ecoute
+      # Les conteneurs referenceront ce nom dans leurs labels :
+      #   traefik.http.routers.xxx.entrypoints=web
+      - "--entrypoints.web.address=:80"
+
+      # Active le dashboard Traefik (interface web d'administration)
+      # Accessible sur http://localhost:8080
+      # Le dashboard montre les routeurs, services et middlewares
+      - "--api.dashboard=true"
+
+      # Active l'API de Traefik (utilisee par le dashboard)
+      # "insecure" signifie sans authentification
+      # EN PRODUCTION : desactivez ceci ou ajoutez une authentification !
+      - "--api.insecure=true"
+
+      # Active les logs d'acces (chaque requete est loguee)
+      # Utile pour le debug et le monitoring
+      - "--accesslog=true"
+
+      # Niveau de log : DEBUG pour voir tous les details
+      # En production, utilisez "ERROR" ou "WARN"
+      # Niveaux disponibles : DEBUG, INFO, WARN, ERROR
+      - "--log.level=DEBUG"
+
+    # --- PORTS ---
+    # Les ports exposes sur la machine hote
+    # Format : "port_hote:port_conteneur"
+    ports:
+      # Port 80 : point d'entree principal (HTTP)
+      # Les utilisateurs accedent a l'application via ce port
+      # http://localhost --> Traefik --> Blue ou Green
+      - "80:80"
+
+      # Port 8080 : dashboard Traefik (administration)
+      # Accessible a http://localhost:8080 dans le navigateur
+      # Montre l'etat des routeurs et des services
+      - "8080:8080"
+
+    # --- VOLUMES ---
+    # Traefik a besoin d'acceder au socket Docker
+    # pour detecter les conteneurs et lire leurs labels
+    volumes:
+      # Le socket Docker : permet a Traefik de communiquer avec Docker
+      # /var/run/docker.sock est le fichier "special" qui permet
+      # aux applications de controles Docker depuis l'interieur d'un conteneur
+      # SECURITE : en production, limitez les permissions (read-only)
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # ":ro" = read-only (lecture seule)
+      # Traefik n'a besoin que de LIRE les informations Docker
+      # pas de creer ou supprimer des conteneurs
+
+    # --- RESEAUX ---
+    # Traefik doit etre sur le MEME reseau que Blue et Green
+    # pour pouvoir communiquer avec eux
+    networks:
+      - web
+
+    # --- REDEMARRAGE AUTOMATIQUE ---
+    # Si Traefik plante, Docker le redemarre automatiquement
+    restart: unless-stopped
+
+    # --- LABELS ---
+    # Le dashboard Traefik est accessible directement sur http://localhost:8080
+    # grace au mapping de ports ci-dessus (port 8080:8080).
+    # Pas besoin de definir un routeur supplementaire pour le dashboard.
+    labels:
+      - "traefik.enable=false"
+
+# --- DEFINITION DES RESEAUX ---
+# Le reseau "web" est EXTERNE : il doit etre cree avant de lancer ce fichier
+# Commande : docker network create web
+# Ce reseau est partage entre Traefik, Blue et Green
+networks:
+  web:
+    external: true    # Le reseau existe deja (cree manuellement)

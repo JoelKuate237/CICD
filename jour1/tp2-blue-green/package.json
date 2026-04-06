@@ -1,0 +1,14 @@
+{
+  "name": "tp2-blue-green-app",
+  "version": "1.0.0",
+  "description": "Application de demonstration pour le TP2 Blue/Green",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "author": "Formation CI/CD",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

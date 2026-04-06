@@ -1,0 +1,82 @@
+# =============================================================================
+# Pipeline enfant (child pipeline)
+# Ce pipeline est declenche par le job "trigger-child" du pipeline parent.
+# Il recoit des variables du parent et execute ses propres jobs.
+# =============================================================================
+
+# --- Variables avec valeurs par defaut ---
+# Ces valeurs sont ecrasees par celles du parent quand il declenche ce pipeline.
+variables:
+  PARENT_VERSION: 'inconnu'
+  PARENT_PIPELINE_ID: 'inconnu'
+  PARENT_COMMIT: 'inconnu'
+  PARENT_BRANCH: 'inconnu'
+
+# --- Stages du pipeline enfant ---
+stages:
+  - validate
+  - notify
+
+# =============================================================================
+# Stage : validate
+# =============================================================================
+
+validate-deployment:
+  stage: validate
+  image: alpine:latest
+  script:
+    - 'echo "========================================="'
+    - 'echo "  Validation du deploiement"'
+    - 'echo "========================================="'
+    - 'echo ""'
+    - 'echo "Informations recues du pipeline parent :"'
+    - 'echo "  Version : $PARENT_VERSION"'
+    - 'echo "  Pipeline parent ID : $PARENT_PIPELINE_ID"'
+    - 'echo "  Commit : $PARENT_COMMIT"'
+    - 'echo "  Branche : $PARENT_BRANCH"'
+    - 'echo ""'
+    - 'echo "Verification 1 : Version non vide..."'
+    - |
+      if [ "$PARENT_VERSION" = "inconnu" ]; then
+        echo "ATTENTION : la version n'a pas ete transmise par le parent"
+      else
+        echo "OK : version $PARENT_VERSION recue"
+      fi
+    - 'echo "Verification 2 : Pipeline ID non vide..."'
+    - |
+      if [ "$PARENT_PIPELINE_ID" = "inconnu" ]; then
+        echo "ATTENTION : le pipeline ID n'a pas ete transmis par le parent"
+      else
+        echo "OK : pipeline parent #$PARENT_PIPELINE_ID"
+      fi
+    - 'echo ""'
+    - 'echo "Toutes les validations sont passees !"'
+
+# =============================================================================
+# Stage : notify
+# =============================================================================
+
+notify-team:
+  stage: notify
+  image: alpine:latest
+  script:
+    - 'echo "========================================="'
+    - 'echo "  Notification equipe"'
+    - 'echo "========================================="'
+    - 'echo ""'
+    - 'echo "Simulation envoi de notification :"'
+    - 'echo "  Canal : #deployments"'
+    - 'echo "  Message : Deploiement valide"'
+    - 'echo "  Version : $PARENT_VERSION"'
+    - 'echo "  Commit : $PARENT_COMMIT"'
+    - 'echo "  Branche : $PARENT_BRANCH"'
+    - 'echo "  Pipeline parent : #$PARENT_PIPELINE_ID"'
+    - 'echo "  Pipeline enfant : #$CI_PIPELINE_ID"'
+    - 'echo ""'
+    - 'echo "Dans un vrai projet, on enverrait ici un message Slack ou Teams."'
+    - 'echo "Exemple avec curl (desactive) :"'
+    - 'echo "  curl -X POST https://hooks.slack.com/... -d {message}"'
+    - 'echo ""'
+    - 'echo "Notification envoyee avec succes !"'
+  needs:
+    - validate-deployment

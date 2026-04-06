@@ -1,0 +1,119 @@
+# ============================================================
+# FICHIER : docker-compose.green.yml
+# DESCRIPTION : Environnement Green (nouvelle version a deployer)
+#
+# Ce fichier definit le conteneur de l'application pour
+# l'environnement GREEN dans la strategie Blue/Green.
+#
+# Green = la NOUVELLE version que l'on veut deployer.
+# Green est deploye et teste PENDANT que Blue continue
+# de servir les utilisateurs. Une fois Green valide,
+# on bascule le trafic de Blue vers Green.
+#
+# Ce fichier est tres similaire a docker-compose.blue.yml.
+# Les differences sont :
+#   - Le nom du conteneur (app-green au lieu de app-blue)
+#   - La variable APP_ENV (green au lieu de blue)
+#   - La variable APP_VERSION (2.0.0 au lieu de 1.0.0)
+#   - Les labels Traefik (green au lieu de blue)
+#   - La priorite Traefik (10 au lieu de 1, plus haute)
+# ============================================================
+
+# NOTE : la cle "version" est volontairement absente (obsolete en Docker Compose v2)
+
+# --- DEFINITION DES SERVICES ---
+services:
+
+  # Service principal : l'application Green
+  app-green:
+    # --- NOM DU CONTENEUR ---
+    # Nom unique pour identifier ce conteneur (different de Blue)
+    container_name: app-green
+
+    # --- IMAGE DOCKER ---
+    # Meme image de base que Blue
+    # En production, on utiliserait l'image avec le nouveau code :
+    #   image: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}
+    image: node:18-alpine
+
+    # --- COMMANDE DE DEMARRAGE ---
+    # Identique a Blue : installe les dependances et lance le serveur
+    command: sh -c "cd /app && npm install --production && node src/index.js"
+
+    # --- VOLUMES ---
+    # Memes volumes que Blue (dans un vrai projet, le code serait
+    # dans l'image Docker, pas dans un volume)
+    volumes:
+      - ./src:/app/src                    # Code source
+      - ./package.json:/app/package.json  # Dependances
+
+    # --- REPERTOIRE DE TRAVAIL ---
+    working_dir: /app
+
+    # --- VARIABLES D'ENVIRONNEMENT ---
+    environment:
+      # Meme port que Blue
+      - PORT=3000
+      # Meme environnement Node.js
+      - NODE_ENV=production
+      # DIFFERENCE : identifiant "green" au lieu de "blue"
+      # Cela permet de savoir quel environnement repond
+      - APP_ENV=green
+      # DIFFERENCE : nouvelle version
+      # En production, ce serait le hash du commit ou un numero de version
+      - APP_VERSION=2.0.0
+
+    # --- LABELS TRAEFIK ---
+    # Les labels sont differents de Blue pour que Traefik
+    # puisse distinguer les deux environnements
+    labels:
+      # Active Traefik pour ce conteneur
+      - "traefik.enable=true"
+
+      # Regle de routage pour Green
+      # MEME regle que Blue : meme host, meme chemin
+      # Traefik utilisera la PRIORITE pour decider lequel servir
+      - "traefik.http.routers.green.rule=Host(`localhost`) && PathPrefix(`/`)"
+
+      # Point d'entree
+      - "traefik.http.routers.green.entrypoints=web"
+
+      # Port de l'application dans le conteneur
+      - "traefik.http.services.green.loadbalancer.server.port=3000"
+
+      # DIFFERENCE CLE : Priorite plus HAUTE que Blue (10 > 1)
+      # Quand Blue et Green sont tous les deux en ligne,
+      # Traefik enverra le trafic vers Green car sa priorite est plus haute.
+      # C'est ce mecanisme qui permet la "bascule" :
+      #   - Blue seul   : trafic vers Blue (priorite 1)
+      #   - Blue + Green: trafic vers Green (priorite 10 > 1)
+      #   - Green seul  : trafic vers Green (priorite 10)
+      - "traefik.http.routers.green.priority=10"
+
+    # --- RESEAUX ---
+    # Meme reseau que Blue et Traefik
+    networks:
+      - web
+
+    # --- REDEMARRAGE AUTOMATIQUE ---
+    restart: unless-stopped
+
+    # --- HEALTH CHECK ---
+    # Meme configuration que Blue pour la verification de sante
+    healthcheck:
+      # Verifie que l'endpoint /health repond
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      # Verification toutes les 10 secondes
+      interval: 10s
+      # Timeout de 5 secondes par verification
+      timeout: 5s
+      # 3 echecs consecutifs = conteneur "unhealthy"
+      retries: 3
+      # Attendre 15 secondes avant la premiere verification
+      start_period: 15s
+
+# --- DEFINITION DES RESEAUX ---
+# Meme reseau externe que Blue
+networks:
+  web:
+    external: true    # Le reseau doit exister (docker network create web)

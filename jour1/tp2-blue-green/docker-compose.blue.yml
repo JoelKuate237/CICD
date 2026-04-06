@@ -1,0 +1,131 @@
+# ============================================================
+# FICHIER : docker-compose.blue.yml
+# DESCRIPTION : Environnement Blue (version actuelle en production)
+#
+# Ce fichier definit le conteneur de l'application pour
+# l'environnement BLUE dans la strategie Blue/Green.
+#
+# Blue = la version ACTUELLE qui sert les utilisateurs.
+# Pendant un deploiement, Blue continue de fonctionner
+# pendant que Green est prepare avec la nouvelle version.
+#
+# Docker Compose simplifie le lancement de conteneurs Docker
+# en regroupant toute la configuration dans un fichier YAML.
+# ============================================================
+
+# NOTE : la cle "version" est volontairement absente.
+# Dans Docker Compose v2 (celui utilise aujourd'hui), elle est obsolete
+# et genere un warning. On laisse Docker Compose determiner la version automatiquement.
+
+# --- DEFINITION DES SERVICES ---
+# Un "service" dans Docker Compose = un conteneur Docker
+# Chaque service a un nom, une image, des ports, etc.
+services:
+
+  # Service principal : l'application Blue
+  app-blue:
+    # --- NOM DU CONTENEUR ---
+    # Ce nom est utilise pour identifier le conteneur dans Docker
+    # et dans les logs. Il doit etre unique sur la machine.
+    container_name: app-blue
+
+    # --- IMAGE DOCKER ---
+    # L'image a utiliser pour creer le conteneur.
+    # Dans un vrai projet, ce serait votre image custom :
+    #   image: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}
+    # Pour la demo, on utilise l'image officielle Node.js
+    image: node:18-alpine
+
+    # --- COMMANDE DE DEMARRAGE ---
+    # La commande executee quand le conteneur demarre.
+    # On installe les dependances puis on lance le serveur.
+    # En production, on utiliserait une image deja buildee.
+    command: sh -c "cd /app && npm install --production && node src/index.js"
+
+    # --- VOLUMES ---
+    # Les volumes permettent de partager des fichiers entre
+    # la machine hote et le conteneur.
+    # "./src" sur la machine --> "/app/src" dans le conteneur
+    volumes:
+      - ./src:/app/src                    # Code source de l'application
+      - ./package.json:/app/package.json  # Fichier de dependances
+
+    # --- REPERTOIRE DE TRAVAIL ---
+    # Le repertoire par defaut quand on entre dans le conteneur
+    working_dir: /app
+
+    # --- VARIABLES D'ENVIRONNEMENT ---
+    # Les variables disponibles dans l'application
+    environment:
+      # Le port sur lequel le serveur ecoute
+      - PORT=3000
+      # L'environnement : production pour Blue (version stable)
+      - NODE_ENV=production
+      # Un identifiant pour savoir quel environnement repond
+      - APP_ENV=blue
+      # La version deployee (pour le monitoring)
+      - APP_VERSION=1.0.0
+
+    # --- LABELS TRAEFIK ---
+    # Les labels sont des metadonnees sur le conteneur.
+    # Traefik lit ces labels pour savoir comment router le trafic.
+    labels:
+      # Active Traefik pour ce conteneur
+      # Sans ce label, Traefik ignore le conteneur
+      - "traefik.enable=true"
+
+      # Definit la regle de routage
+      # Host(`localhost`) = route les requetes pour "localhost"
+      # PathPrefix(`/`) = route toutes les URLs (/)
+      - "traefik.http.routers.blue.rule=Host(`localhost`) && PathPrefix(`/`)"
+
+      # Definit le point d'entree (port d'ecoute de Traefik)
+      # "web" correspond au point d'entree defini dans traefik.yml
+      - "traefik.http.routers.blue.entrypoints=web"
+
+      # Definit le port du service dans le conteneur
+      # Traefik a besoin de savoir sur quel port l'application ecoute
+      - "traefik.http.services.blue.loadbalancer.server.port=3000"
+
+      # Definit la priorite du routage
+      # Une priorite plus haute = ce service est prefere
+      # Blue a une priorite de 1 (basse)
+      # Si Green est aussi disponible avec une priorite plus haute,
+      # Traefik enverra le trafic vers Green
+      - "traefik.http.routers.blue.priority=1"
+
+    # --- RESEAUX ---
+    # Le conteneur est connecte au reseau "web"
+    # Ce reseau est partage avec Traefik et Green
+    # Sans ce reseau, les conteneurs ne pourraient pas communiquer
+    networks:
+      - web
+
+    # --- REDEMARRAGE AUTOMATIQUE ---
+    # Si le conteneur plante, Docker le redemarre automatiquement
+    # "unless-stopped" = redemarre sauf si arrete manuellement
+    restart: unless-stopped
+
+    # --- HEALTH CHECK ---
+    # Docker verifie regulierement que le conteneur est en bonne sante
+    # Si le health check echoue, Docker considere le conteneur comme "unhealthy"
+    healthcheck:
+      # La commande de verification
+      # wget appelle l'endpoint /health de notre application
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      # Intervalle entre les verifications
+      interval: 10s
+      # Temps maximum pour une verification
+      timeout: 5s
+      # Nombre de tentatives avant de considerer le conteneur comme "unhealthy"
+      retries: 3
+      # Delai avant la premiere verification (laisser le temps au serveur de demarrer)
+      start_period: 15s
+
+# --- DEFINITION DES RESEAUX ---
+# On declare le reseau "web" comme EXTERNE
+# Cela signifie qu'il doit exister avant de lancer docker-compose
+# Il est cree manuellement avec : docker network create web
+networks:
+  web:
+    external: true    # Le reseau existe deja (cree manuellement)

@@ -1,0 +1,53 @@
+{
+  "name": "jour2-projet-demo",
+  "version": "1.0.0",
+  "description": "Projet de demonstration pour le Jour 2 - CI/CD avec GitLab Runners et Executors",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "test": "jest --verbose --forceExit",
+    "test:coverage": "jest --verbose --coverage --forceExit",
+    "test:junit": "jest --verbose --forceExit --reporters=default --reporters=jest-junit",
+    "test:ci": "jest --verbose --coverage --forceExit --reporters=default --reporters=jest-junit --coverageReporters=text --coverageReporters=cobertura",
+    "build": "node scripts/build.js",
+    "lint": "echo 'Linting du code...' && exit 0"
+  },
+  "keywords": [
+    "cicd",
+    "gitlab",
+    "formation",
+    "jour2"
+  ],
+  "author": "Formation CI/CD",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "cobertura"
+    ]
+  },
+  "jest-junit": {
+    "outputDirectory": ".",
+    "outputName": "junit-report.xml",
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}"
+  }
+}

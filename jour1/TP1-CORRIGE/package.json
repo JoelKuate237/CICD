@@ -1,0 +1,26 @@
+{
+  "name": "projet-demo-cicd",
+  "version": "1.0.0",
+  "description": "Projet de demonstration pour le cours CI/CD - TP1",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest --verbose",
+    "test:unit": "jest tests/utils.test.js --verbose",
+    "test:integration": "jest tests/api.test.js --verbose",
+    "build": "mkdir -p dist && cp -r src/* dist/ && echo 'Build termine'"
+  },
+  "author": "Formation CI/CD",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "verbose": true
+  }
+}

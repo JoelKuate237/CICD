@@ -1,0 +1,47 @@
+# ============================================================
+# FICHIER : .gitlab/ci/build.yml
+# Configuration du stage "build"
+# ============================================================
+
+# TEMPLATE reutilisable : .base-node
+# Le point au debut (.base-node) signifie "job template"
+# Il ne s'execute pas tout seul, mais sert de modele via "extends"
+# Avantage : evite la duplication entre les jobs build et test
+.base-node:
+  image: node:${NODE_VERSION}-alpine
+  before_script:
+    - echo "Node.js version $(node --version)"
+    - echo "npm version $(npm --version)"
+    # npm ci installe exactement les versions du package-lock.json
+    # --cache .npm accelere les runs suivants
+    # --prefer-offline utilise le cache si disponible
+    - npm ci --cache .npm --prefer-offline
+  cache:
+    # Cle basee sur la branche : chaque branche a son propre cache
+    key: "node-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .npm/
+      - node_modules/
+
+# JOB : build-app
+# C'est un VRAI job (pas de point au debut)
+build-app:
+  extends: .base-node  # reprend tout le contenu du template ci-dessus
+  stage: build         # s'execute dans le stage "build"
+  script:
+    - echo "========================================="
+    - echo "  Construction de $APP_NAME"
+    - echo "========================================="
+    - npm run build
+    - echo "--- Contenu du dossier dist/ ---"
+    - ls -la dist/
+    - echo "--- Taille du build ---"
+    - du -sh dist/
+    - echo "Build termine avec succes"
+  # Artifacts : fichiers a transmettre aux jobs suivants
+  artifacts:
+    name: "build-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - dist/
+    expire_in: 1 day  # supprime apres 24h pour economiser l'espace GitLab
+    when: on_success
